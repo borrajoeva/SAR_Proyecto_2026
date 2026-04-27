@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Archivos específicos del proyecto SAR
+*.bin
+*.index
+/datasets/
+/data/
