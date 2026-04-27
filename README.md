@@ -31,7 +31,7 @@ Para generar un índice a partir de una carpeta con archivos JSON de Wikipedia:
 python SAR_Indexer.py <dir_articulos> <nombre_indice> [-P] [-S]
 ```
 
-### 2. Parámetros y Opciones
+#### Parámetros y Opciones
 
 - `dir`: Directorio con los artículos en formato JSON.  
 - `index`: Nombre del fichero donde se guardará el índice.  
@@ -39,9 +39,8 @@ python SAR_Indexer.py <dir_articulos> <nombre_indice> [-P] [-S]
 - `-P` / `--positional`: *(Opcional)* Calcula el índice posicional para permitir búsquedas de frases.  
 - `-S` / `--semantic`: *(Opcional)* Calcula el índice semántico para búsquedas por similitud.  
 
----
 
-## 🔍 Recuperación (Búsqueda)
+### 2. Recuperación (Búsqueda)
 
 Para buscar artículos en el índice creado:
 
@@ -49,7 +48,7 @@ Para buscar artículos en el índice creado:
 python SAR_Searcher.py <nombre_indice> [opciones]
 ```
 
-### ⚙️ Opciones
+#### Opciones
 * -Q "consulta": Ejecuta una consulta directa
 
   ej:
@@ -61,6 +60,15 @@ python SAR_Searcher.py <nombre_indice> [opciones]
 * -C / --count: Muestra solo el número de artículos recuperados.
 * -A / --all: Muestra todos los resultados (por defecto solo se muestran los 10 primeros).
 * -R / --semantic_ranking: Ordena los resultados de la búsqueda binaria por similitud semántica.
+
+### 3. Evaluación Oficial (Modo Test)
+
+Este es el método principal para comprobar si la implementación es correcta y coincide con los resultados de referencia.  
+```bash
+python SAR_Searcher.py mi_indice.bin -T test_list.txt
+```
+* **Si todo es correcto:** El programa mostrará el mensaje "Parece que todo ha ido bien, buen trabajo!".  
+* **Si hay errores:** Se resaltarán las consultas donde el número de artículos recuperados no coincida con la referencia.
 
 ---
 
