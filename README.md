@@ -50,7 +50,7 @@ python SAR_Searcher.py <nombre_indice> [opciones]
 ```
 
 ### ⚙️ Opciones
-* Q "consulta": Ejecuta una consulta directa
+* -Q "consulta": Ejecuta una consulta directa
 
   ej:
   ```bash
