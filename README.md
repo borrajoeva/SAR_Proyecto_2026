@@ -1,6 +1,6 @@
 # Proyecto SAR - Buscador de Wikipedia (Curso 2025-2026)
 
-Este proyecto consiste en la implementación de un sistema de recuperación de información eficiente para artículos de la Wikipedia en formato JSON. Es un proyecto coordinado entre las asignaturas de **Sistemas de Almacenamiento y Recuperación de Información (SAR)** y **Algorítmica (ALT)**.
+Este proyecto consiste en la implementación de un sistema de recuperación de información eficiente para artículos de la Wikipedia en formato JSON. Es un proyecto coordinado entre las asignaturas de **Sistemas de Almacenamiento y Recuperación de Información (SAR)**.
 
 ---
 
