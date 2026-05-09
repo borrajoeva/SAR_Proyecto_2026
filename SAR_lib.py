@@ -359,7 +359,21 @@ class SAR_Indexer:
 
         for i, line in enumerate(open(filename)):
             j = self.parse_article(line)
+            url=j['url']
+            if url not in self.urls:
+                id_articulo = len(self.articles)
+                self.articles[id_articulo] = {'title': j['title'], 'url': url}
+                self.urls.add(url)
 
+            palabras = self.tokenize(j['all'])
+            palabras_unicas = set(palabras)
+            for p in palabras_unicas:
+                if p not in self.index:
+                    self.index[p] = [id_articulo]
+
+                else:
+                    self.index[p].append(id_articulo)
+            
 
         #
         # 
