@@ -627,9 +627,42 @@ class SAR_Indexer:
         return: posting list con los artid incluidos de p1 y no en p2
 
         """
-
+        res = []
+        i = 0
+        j = 0
         
-        pass
+        # Calculamos el tamaño del salto para cada lista
+        salto_p1 = int(math.sqrt(len(p1))) if len(p1) > 0 else 1
+        salto_p2 = int(math.sqrt(len(p2))) if len(p2) > 0 else 1
+
+        while i < len(p1) and j < len(p2):
+            
+            # CASO 1: Son iguales (gato y perro coinciden, así que lo descartamos)
+            if p1[i] == p2[j]:
+                # Avanzamos el puntero i
+                i+=1
+                # Avanzamos el puntero j
+                j+=1
+
+            elif p1[i] < p2[j]:
+                # Guardamos el número en 'res' 
+                res.append(p1[i])
+
+                # Avanzamos el puntero i
+                if i + salto_p1 < len(p1) and p1[i + salto_p1] <= p2[j]:
+                    i+=salto_p1
+                else:
+                    i+=1
+
+            else:
+                # Avanzamos solo el puntero j
+                if j + salto_p2 < len(p2) and p2[j + salto_p2] <= p1[i]:
+                    j+=salto_p2
+                else:
+                    j+=1
+
+        if i < len(p1):
+            res.extend(p1[i:])
         ########################################################
         ## COMPLETAR PARA TODAS LAS VERSIONES SI ES NECESARIO ##
         ########################################################
