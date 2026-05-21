@@ -575,8 +575,36 @@ class SAR_Indexer:
         return: posting list con los artid incluidos en p1 y p2
 
         """
+        res = []
+        i = 0
+        j = 0
+
+        while i < len(p1) and j < len(p2):
+            
+            # CASO 1: Los números en los que están los punteros son iguales
+            if p1[i] == p2[j]:
+                # Guardamos el número en 'res' 
+                res.append(p1[i])
+                # Avanzamos el puntero i
+                i+=1
+                # Avanzamos el puntero j
+                j+=1
+                
+
+            # CASO 2: El número de p1 es menor que el de p2
+            elif p1[i] < p2[j]:
+                # Avanzamos solo el puntero i
+                i+=1
+               
+                
+            # CASO 3: El número de p2 es menor que el de p1
+            else:
+                # Avanzamos solo el puntero j
+                j+=1
+
+        return res
         
-        pass
+        
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
         ########################################
