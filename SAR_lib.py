@@ -10,6 +10,7 @@ import pickle
 import nltk
 from SAR_semantics import SentenceBertEmbeddingModel, BetoEmbeddingCLSModel, BetoEmbeddingModel, SpacyStaticModel
 
+import math
 
 ## UTILIZAR PARA LA AMPLIACION
 # Selecciona un modelo semántico
@@ -579,6 +580,10 @@ class SAR_Indexer:
         i = 0
         j = 0
 
+        # Calculamos el tamaño del salto para cada lista
+        salto_p1 = int(math.sqrt(len(p1))) if len(p1) > 0 else 1
+        salto_p2 = int(math.sqrt(len(p2))) if len(p2) > 0 else 1
+
         while i < len(p1) and j < len(p2):
             
             # CASO 1: Los números en los que están los punteros son iguales
@@ -593,14 +598,21 @@ class SAR_Indexer:
 
             # CASO 2: El número de p1 es menor que el de p2
             elif p1[i] < p2[j]:
-                # Avanzamos solo el puntero i
-                i+=1
+                
+                # Avanzamos el puntero i
+                if i + salto_p1 < len(p1) and p1[i + salto_p1] <= p2[j]:
+                    i+=salto_p1
+                else:
+                    i+=1
                
                 
             # CASO 3: El número de p2 es menor que el de p1
             else:
                 # Avanzamos solo el puntero j
-                j+=1
+                if j + salto_p2 < len(p2) and p2[j + salto_p2] <= p1[i]:
+                    j+=salto_p2
+                else:
+                    j+=1
 
         return res
         
@@ -663,6 +675,9 @@ class SAR_Indexer:
 
         if i < len(p1):
             res.extend(p1[i:])
+
+        return res
+
         ########################################################
         ## COMPLETAR PARA TODAS LAS VERSIONES SI ES NECESARIO ##
         ########################################################
