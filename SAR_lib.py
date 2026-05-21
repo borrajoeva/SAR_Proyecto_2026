@@ -196,10 +196,21 @@ class SAR_Indexer:
         """
 
         #1 - completar
+        # Extraemos las frases del artículo
+        cks= nltk.sent_tokenize(txt)
 
         #2 - completar
 
-        pass             
+        # Obtenemos los embeddings de todas las frases de golpe
+        embs_del_articulo = self.model.get_embeddings(cks)
+
+        for i, c in enumerate(cks):
+            self.chuncks.append(c)
+            self.chunck_index.append(artid)
+            self.embeddings.append(embs_del_articulo[i])
+            
+        self.artid_to_emb[artid] = embs_del_articulo
+
         
 
     def create_kdtree(self):
