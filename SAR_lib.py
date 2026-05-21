@@ -366,6 +366,7 @@ class SAR_Indexer:
         #################
         ### COMPLETAR ###
         #################
+
         #Sacamos tamaño actual de self.docs (numero total de ficheros registrados)
         docid = len(self.docs)
         #Asignamos el ID calculado al fichero y lo registramos
@@ -375,7 +376,7 @@ class SAR_Indexer:
         for i, line in enumerate(open(filename)): 
 
             # Con parse_article convertimos esa linea leida en un diccionario con campos
-            j = self.parse_article(line) #Con parse_article convertimos esa linea leida en un diccionario con campos
+            j = self.parse_article(line)
             url = j['url']
 
             # Comprobamos si el artículo ya está indexado
@@ -387,19 +388,34 @@ class SAR_Indexer:
                 'docid': docid,
                 'pos': i 
                 }
+
                 self.urls.add(url)
 
                 palabras = self.tokenize(j[self.DEFAULT_FIELD])
                 palabras_unicas = set(palabras)
 
-                # Analizamos las palabras si el artículo es nuevo
-                for p in palabras_unicas:
-                    if p not in self.index:
-                        self.index[p] = [id_articulo]
+                if not self.positional:
+                    # Analizamos las palabras si el artículo es nuevo
+                    for p in palabras_unicas:
+                        if p not in self.index:
+                            self.index[p] = [id_articulo]
+                        else:
+                            self.index[p].append(id_articulo)
 
-                    else:
-                        self.index[p].append(id_articulo)
-            
+                else:
+                    for pos_en_texto, k in enumerate(palabras):
+                        if k not in self.index:
+                            self.index[k] = [[id_articulo, [pos_en_texto]]]
+
+                        else:
+                            if self.index[k][-1][0] == id_articulo:
+                                self.index[k][-1][1].append(pos_en_texto)
+                            else:
+                                self.index[k].append([id_articulo, [pos_en_texto]])
+
+                # AMPLIACIÓN SEMÁNTICA: Extrae y guarda las frases del artículo
+                if self.semantic:
+                    self.update_chuncks(j[self.DEFAULT_FIELD], id_articulo)
 
        
 
