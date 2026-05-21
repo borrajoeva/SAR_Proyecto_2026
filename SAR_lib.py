@@ -356,26 +356,7 @@ class SAR_Indexer:
         dependiendo del valor de self.positional se debe ampliar el indexado
 
         """
-
-        for i, line in enumerate(open(filename)):
-            j = self.parse_article(line)
-            url=j['url']
-            if url not in self.urls:
-                id_articulo = len(self.articles)
-                self.articles[id_articulo] = {'title': j['title'], 'url': url}
-                self.urls.add(url)
-
-            palabras = self.tokenize(j['all'])
-            palabras_unicas = set(palabras)
-            for p in palabras_unicas:
-                if p not in self.index:
-                    self.index[p] = [id_articulo]
-
-                else:
-                    self.index[p].append(id_articulo)
-            
-
-        #
+         #
         # 
         # Solo se debe indexar el contenido self.DEFAULT_FIELD
         #
@@ -384,6 +365,42 @@ class SAR_Indexer:
         #################
         ### COMPLETAR ###
         #################
+        #Sacamos tamaño actual de self.docs (numero total de ficheros registrados)
+        docid = len(self.docs)
+        #Asignamos el ID calculado al fichero y lo registramos
+        self.docs[docid] = filename 
+
+        # Recorremos cada linea del archivo, cada linea es un objeto JSON
+        for i, line in enumerate(open(filename)): 
+
+            # Con parse_article convertimos esa linea leida en un diccionario con campos
+            j = self.parse_article(line) #Con parse_article convertimos esa linea leida en un diccionario con campos
+            url = j['url']
+
+            # Comprobamos si el artículo ya está indexado
+            if not self.already_in_index(j):
+                id_articulo = len(self.articles)
+                self.articles[id_articulo] = {
+                'title': j['title'], 
+                'url': url,
+                'docid': docid,
+                'pos': i 
+                }
+                self.urls.add(url)
+
+                palabras = self.tokenize(j[self.DEFAULT_FIELD])
+                palabras_unicas = set(palabras)
+                
+                # Analizamos las palabras si el artículo es nuevo
+                for p in palabras_unicas:
+                    if p not in self.index:
+                        self.index[p] = [id_articulo]
+
+                    else:
+                        self.index[p].append(id_articulo)
+            
+
+       
 
 
     def tokenize(self, text:str):
@@ -410,6 +427,28 @@ class SAR_Indexer:
         Muestra estadisticas de los indices
 
         """
+        nump=len(self.index) 
+        numart=len(self.articles) 
+        numdocs=len(self.docs) 
+        numpostings= 0
+
+        # Calculamos el gran total de postings
+        for p in self.index:
+            numpostings += len(self.index[p])
+
+        # Imprimimos los totales globales una sola vez
+        print(f"Ficheros indexados: {numdocs}")
+        print(f"Atículos indexados: {numart}")
+        print(f"Vocabulario: {nump}")
+        print(f"Número de postings: {numpostings}")
+
+        # Preparamos la muestra alfabética de las 10 primeras palabras
+        listakeys = sorted(self.index.keys())
+        listakeys = listakeys[:10]
+
+        # Imprimimos cada palabra de la muestra con su tamaño individual
+        for p in listakeys:
+            print(f"{p}: {len(self.index[p])}")
         pass
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
