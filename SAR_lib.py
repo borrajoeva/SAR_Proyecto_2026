@@ -462,7 +462,7 @@ class SAR_Indexer:
 
         # Calculamos el gran total de postings
         for p in self.index:
-            numpostings += len(self.index[p])
+            numpostings += len(self.get_posting(p))
 
         # Imprimimos los totales globales una sola vez
         print(f"Ficheros indexados: {numdocs}")
@@ -476,7 +476,7 @@ class SAR_Indexer:
 
         # Imprimimos cada palabra de la muestra con su tamaño individual
         for p in listakeys:
-            print(f"{p}: {len(self.index[p])}")
+            print(f"{p}: {len(self.get_posting(p))}")
         
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
@@ -542,7 +542,15 @@ class SAR_Indexer:
         ########################################
         # Si la palabra existe en el índice invertido, devolvemos su lista de artículos
         if term in self.index:
-            return self.index[term]
+            if not self.positional:
+                # Devolvemos la lista tal cual
+                return self.index[term]
+            else:
+                lista_limpia = []
+                for art in self.index[term]:
+                    lista_limpia.append(art[0])
+                return lista_limpia
+
         # Si no existe, devolvemos una lista vacía de forma segura
         else:
             return []
