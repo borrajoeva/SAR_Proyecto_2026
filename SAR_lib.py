@@ -390,7 +390,7 @@ class SAR_Indexer:
 
                 palabras = self.tokenize(j[self.DEFAULT_FIELD])
                 palabras_unicas = set(palabras)
-                
+
                 # Analizamos las palabras si el artículo es nuevo
                 for p in palabras_unicas:
                     if p not in self.index:
@@ -449,7 +449,7 @@ class SAR_Indexer:
         # Imprimimos cada palabra de la muestra con su tamaño individual
         for p in listakeys:
             print(f"{p}: {len(self.index[p])}")
-        pass
+        
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
         ########################################
@@ -512,7 +512,13 @@ class SAR_Indexer:
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
         ########################################
-        pass
+        # Si la palabra existe en el índice invertido, devolvemos su lista de artículos
+        if term in self.index:
+            return self.index[term]
+        # Si no existe, devolvemos una lista vacía de forma segura
+        else:
+            return []
+        
 
 
 
