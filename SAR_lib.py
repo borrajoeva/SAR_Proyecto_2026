@@ -224,7 +224,12 @@ class SAR_Indexer:
         
         """
         print(f"Creating kdtree ...", end="")
-	    # completar
+
+        # 1. Se llama al método fit pasándole la lista con todos los embeddings de las frases
+        # 2. Se almacena opcionalmente el KDTree generado en el atributo de la clase
+        if self.embeddings:
+            self.kdtree = self.model.fit(self.embeddings)
+
         print("done!")
 
 
@@ -267,10 +272,19 @@ class SAR_Indexer:
                 break
         # 5
         lista_final=[]
-        for r in resultados:
-            id_articulo=self.chunck_index[r[1]]
-
-            if id_articulo not in lista_final:
+        vistos = set() # Usamos un set para que la búsqueda sea ultrarrápida
+        
+        for dist, idx_chunk in resultados:
+            # Si hay un umbral definido, descartamos estrictamente los que lo superen
+            if self.semantic_threshold is not None and dist > self.semantic_threshold:
+                continue 
+                
+            # Recuperamos a qué artículo pertenece esta frase
+            id_articulo = self.chunck_index[idx_chunk]
+            
+            # Añadimos el artículo solo si no lo hemos visto ya (mantenemos el orden de relevancia)
+            if id_articulo not in vistos:
+                vistos.add(id_articulo)
                 lista_final.append(id_articulo)
 
         return lista_final
@@ -292,17 +306,56 @@ class SAR_Indexer:
         
         self.load_semantic_model()
         # COMPLETAR
-        # 1
-        # 2
-        # 3
-        # 4
-    
+        
+        # Convertimos la lista original a un set para hacer comprobaciones ultra rápidas
+        articulos_buscados = set(articles)
+        
+        # 1 y 2 - Primera consulta con top_k inicial
+        top_k = self.MAX_EMBEDDINGS
+        resultados = self.model.query(query, top_k=top_k)
 
-    ###############################
-    ###                         ###
-    ###   PARTE 1: INDEXACION   ###
-    ###                         ###
-    ###############################
+        # Extraemos los artículos recuperados hasta el momento
+        articulos_recuperados = set()
+        for _, idx_chunk in resultados:
+            articulos_recuperados.add(self.chunck_index[idx_chunk])
+
+        total_embeddings = len(self.embeddings)
+
+        # 3 - Bucle para asegurar que recuperamos todos los artículos de la lista binaria
+        # Condición: "Mientras NO todos los artículos buscados estén dentro de los recuperados..."
+        while not articulos_buscados.issubset(articulos_recuperados) and top_k < total_embeddings:
+            top_k += self.MAX_EMBEDDINGS
+            resultados = self.model.query(query, top_k=top_k)
+            
+            # Actualizamos nuestro set de control
+            articulos_recuperados = set()
+            for _, idx_chunk in resultados:
+                articulos_recuperados.add(self.chunck_index[idx_chunk])
+                
+            if len(resultados) < top_k:
+                break
+
+        # 4 - Utilizar la lista ordenada del kdtree para reordenar la lista "articles"
+        lista_ordenada = []
+        vistos = set()
+
+        # Recorremos los resultados del KDTree (que vienen ordenados del más similar al menos)
+        for _, idx_chunk in resultados:
+            id_art = self.chunck_index[idx_chunk]
+
+            # Solo nos interesan los artículos que nos pasaron por parámetro
+            if id_art in articulos_buscados and id_art not in vistos:
+                lista_ordenada.append(id_art)
+                vistos.add(id_art)
+
+        # Casuística de seguridad extrema: 
+        # Si por algún casual de la vida un artículo no generó embeddings (ej: texto vacío),
+        # lo añadimos al final para no perder el resultado de la búsqueda booleana.
+        for art in articles:
+            if art not in vistos:
+                lista_ordenada.append(art)
+
+        return lista_ordenada
 
     def already_in_index(self, article:Dict) -> bool:
         """
@@ -351,6 +404,11 @@ class SAR_Indexer:
         #####################################################
         ## COMPLETAR SI ES NECESARIO FUNCIONALIDADES EXTRA ##
         #####################################################
+
+        # Una vez recorridos e indexados todos los ficheros, 
+        # generamos el modelo KDTree si la opción semántica está activa.
+        if self.semantic:
+            self.create_kdtree()
         
         
     def parse_article(self, raw_line:str) -> Dict[str, str]:
@@ -536,15 +594,55 @@ class SAR_Indexer:
         return: posting list con el resultado de la query
 
         """
-        
-        if query is None or len(query) == 0:
-            return []
 
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
         ########################################
 
+        if query is None or len(query) == 0:
+            return [], {}
 
+        # Separamos los tokens respetando lo que esté entre comillas dobles
+        tokens = re.findall(r'".*?"|\S+', query)
+
+        res = None
+        es_not = False
+
+        for token in tokens:
+            if token == "NOT":
+                es_not = True
+                continue
+
+            # 1. Comprobamos si es una búsqueda posicional (comienza y termina por comillas)
+            if token.startswith('"') and token.endswith('"'):
+                frase = token[1:-1] # Retiramos las comillas
+                terminos_frase = self.tokenize(frase)
+                p_actual = self.get_positionals(terminos_frase)
+                
+            # 2. Si no tiene comillas, es una búsqueda de un solo término
+            else:
+                terminos_limpios = self.tokenize(token)
+                if len(terminos_limpios) > 0:
+                    p_actual = self.get_posting(terminos_limpios[0])
+                else:
+                    p_actual = []
+
+            # 3. Aplicamos el operador NOT si venía precedido por él
+            if es_not:
+                p_actual = self.reverse_posting(p_actual)
+                es_not = False
+
+            # 4. Acumulamos usando AND implícito
+            if res is None:
+                res = p_actual
+            else:
+                res = self.and_posting(res, p_actual)
+
+        # 5. AMPLIACIÓN SEMÁNTICA: Si el reranking está activo, reordenamos los resultados
+        if self.semantic_ranking and res:
+            res = self.semantic_reranking(query, res)
+
+        return res, {}
 
 
     def get_posting(self, term:str):
@@ -616,11 +714,24 @@ class SAR_Indexer:
 
         """
         
-        pass
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
         ########################################
 
+        res = []
+        i = 0 # Puntero para recorrer la lista p (que ya viene ordenada)
+        total_articulos = len(self.articles)
+        
+        # Recorremos todos los IDs de artículos posibles
+        for artid in range(total_articulos):
+            # Si el artículo actual es igual al que apunta el puntero de p, lo saltamos
+            if i < len(p) and artid == p[i]:
+                i += 1 
+            else:
+                # Si no está en p, lo guardamos en el resultado
+                res.append(artid)
+                
+        return res
 
 
     def and_posting(self, p1:list, p2:list):
@@ -796,10 +907,30 @@ class SAR_Indexer:
         return: el numero de artículo recuperadas, para la opcion -T
 
         """
-        pass
+
         ################
         ## COMPLETAR  ##
         ################
-
-
-
+        
+        # 1. Ejecutamos la consulta
+        res, _ = self.solve_query(query)
+        
+        print(f"{'='*50}")
+        print(f"Query: '{query}'")
+        print(f"Number of results: {len(res)}")
+        
+        # 2. Comprobamos cuántos artículos debemos mostrar
+        if self.show_all:
+            limite = len(res)
+        else:
+            limite = min(len(res), self.SHOW_MAX)
+            
+        # 3. Imprimimos los resultados con el formato requerido
+        for i in range(limite):
+            artid = res[i]
+            info = self.articles[artid]
+            # Formato: Número de orden | ID | Título | URL
+            print(f"#{i+1} \t({artid}) \t{info['title']} \t{info['url']}")
+            
+        # Devuelve el número de resultados (necesario para el modo -T de evaluación)
+        return len(res)
