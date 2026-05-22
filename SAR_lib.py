@@ -246,11 +246,35 @@ class SAR_Indexer:
         
         # COMPLETAR
 
-        # 1
-        # 2
-        # 3
-        # 4
+        # 1 y 2
+        top_k = self.MAX_EMBEDDINGS
+        resultados = self.model.query(query, top_k=top_k)
+
+        # 3 y 4
+        total_embeddings = len(self.embeddings)
+
+        while (self.semantic_threshold is not None and 
+               resultados[-1][0] <= self.semantic_threshold and 
+               top_k < total_embeddings):
+            
+            # Volvemos al paso 2 aumentando top_k
+            top_k += self.MAX_EMBEDDINGS
+            
+            # Volvemos al paso 1 ejecutando la query con el nuevo top_k
+            resultados = self.model.query(query, top_k=top_k)
+            
+            if len(resultados) < top_k:
+                break
         # 5
+        lista_final=[]
+        for r in resultados:
+            id_articulo=self.chunck_index[r[1]]
+
+            if id_articulo not in lista_final:
+                lista_final.append(id_articulo)
+
+        return lista_final
+
 
 
     def semantic_reranking(self, query:str, articles: List[int]):
