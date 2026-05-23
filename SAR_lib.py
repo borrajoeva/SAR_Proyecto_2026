@@ -48,7 +48,7 @@ class SAR_Indexer:
     SHOW_MAX = 10
 
 
-    all_atribs = ['urls', 'index', 'docs', 'articles', 'tokenizer', 'show_all',
+    all_atribs = ['urls', 'index', 'docs', 'articles', 'tokenizer', 'show_all', "positional",
                   "semantic", "chuncks", "embeddings", "chunck_index", "kdtree", "artid_to_emb"]
 
 
@@ -547,18 +547,22 @@ class SAR_Indexer:
             numpostings += len(self.get_posting(p))
 
         # Imprimimos los totales globales una sola vez
-        print(f"Ficheros indexados: {numdocs}")
-        print(f"Atículos indexados: {numart}")
-        print(f"Vocabulario: {nump}")
-        print(f"Número de postings: {numpostings}")
+        print(f"{'='*40}")
+        print(f"Number of indexed files: {numdocs}")
+        print(f"{'-'*40}")
+        print(f"Number of indexed articles: {numart}")
+        print(f"{'-'*40}")
+        print("TOKENS:")
+        print(f"\t# of tokens in '{self.DEFAULT_FIELD}': {nump}")
+        print(f"{'-'*40}")
+        if self.positional:
+            print("Positional queries are allowed.")
+        else:
+            print("Positional queries are NOT allowed.")
+        print(f"{'='*40}")
 
-        # Preparamos la muestra alfabética de las 10 primeras palabras
-        listakeys = sorted(self.index.keys())
-        listakeys = listakeys[:10]
 
-        # Imprimimos cada palabra de la muestra con su tamaño individual
-        for p in listakeys:
-            print(f"{p}: {len(self.get_posting(p))}")
+
         
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
@@ -695,7 +699,63 @@ class SAR_Indexer:
         #################################
         ## COMPLETAR PARA POSICIONALES ##
         #################################
-        pass
+        if not terms:
+            return []
+        if len(terms) == 1:
+            return self.get_posting(terms[0])
+
+        # 1. Recuperamos la estructura posicional completa de la primera palabra
+        # Recuerda que self.index[palabra] tiene: [[artid, [pos1, pos2]], ...]
+        res_intermedio = self.index.get(terms[0], [])
+        if not res_intermedio:
+            return []
+
+        # 2. Vamos cruzando esa lista con el resto de palabras de la frase
+        for i in range(1, len(terms)):
+            siguiente_palabra = terms[i]
+            posting_siguiente = self.index.get(siguiente_palabra, [])
+            
+            if not posting_siguiente:
+                return [] # Si una sola palabra de la frase no existe, el resultado es vacío
+
+            nuevos_resultados = []
+            p1 = 0 # Puntero para nuestra lista acumulada
+            p2 = 0 # Puntero para la posting de la siguiente palabra
+
+            # Bucle estilo and_posting para emparejar los mismos artículos
+            while p1 < len(res_intermedio) and p2 < len(posting_siguiente):
+                artid1, posiciones1 = res_intermedio[p1]
+                artid2, posiciones2 = posting_siguiente[p2]
+
+                if artid1 == artid2:
+                    # ¡Mismo artículo! Ahora comprobamos si las posiciones son consecutivas
+                    pos_coincidentes = []
+                    
+                    # Recorremos las posiciones de la palabra anterior y la siguiente
+                    for pos1 in posiciones1:
+                        # Si pos1 + 1 está en las posiciones de la siguiente palabra... ¡bingo!
+                        if (pos1 + 1) in posiciones2:
+                            pos_coincidentes.append(pos1 + 1)
+
+                    # Si encontramos alguna coincidencia, guardamos este artículo
+                    # Ojo: guardamos 'pos_coincidentes' para que la tercera palabra se compare contra ellas
+                    if pos_coincidentes:
+                        nuevos_resultados.append([artid1, pos_coincidentes])
+
+                    p1 += 1
+                    p2 += 1
+                elif artid1 < artid2:
+                    p1 += 1
+                else:
+                    p2 += 1
+
+            res_intermedio = nuevos_resultados
+            if not res_intermedio:
+                return []
+
+        # 3. Al final, el profesor solo quiere una lista de IDs limpia, no las posiciones
+        lista_final = [art[0] for art in res_intermedio]
+        return lista_final
 
 
 
