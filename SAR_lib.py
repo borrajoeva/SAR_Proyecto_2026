@@ -80,10 +80,7 @@ class SAR_Indexer:
         self.semantic_ranking = None # ¿¿ ranking de consultas binarias ??
         self.model = None
         self.MAX_EMBEDDINGS = 200 # número máximo de embedding que se extraen del kdtree en una consulta
-        
-        
-        
-        
+           
 
     ###############################
     ###                         ###
@@ -332,34 +329,42 @@ class SAR_Indexer:
             self.model.fit(self.chuncks)
             self.kdtree = self.model.kdtree
 
+        articulos_buscados = articles
 
         # Convertimos la lista original a un set para hacer comprobaciones ultra rápidas
-        articulos_buscados = set(articles)
-        
         # 1 y 2 - Primera consulta con top_k inicial
         top_k = self.MAX_EMBEDDINGS
         resultados = self.model.query(query, top_k=top_k)
 
-        # Extraemos los artículos recuperados hasta el momento
-        articulos_recuperados = set()
+        articulos_recuperados = []
         for _, idx_chunk in resultados:
-            articulos_recuperados.add(self.chunck_index[idx_chunk])
+            id_recup = self.chunck_index[idx_chunk]
+            if id_recup not in articulos_recuperados:
+                articulos_recuperados.append(id_recup)
 
         total_embeddings = len(self.embeddings)
 
-        # 3 - Bucle para asegurar que recuperamos todos los artículos de la lista binaria
-        # Condición: "Mientras NO todos los artículos buscados estén dentro de los recuperados..."
-        while not articulos_buscados.issubset(articulos_recuperados) and top_k < total_embeddings:
+        # 3 - Bucle comprobando el subconjunto con and_posting
+        while top_k < total_embeddings:
+            # Ordenamos temporalmente para poder usar el algoritmo teórico
+            recuperados_ordenados = sorted(articulos_recuperados)
+            
+            # Hacemos la intersección
+            interseccion = self.and_posting(articulos_buscados, recuperados_ordenados)
+            
+            # Si el tamaño coincide, todos los buscados han sido recuperados (es subconjunto)
+            if len(interseccion) == len(articulos_buscados):
+                break # Salimos del bucle con éxito
+                
+            # Si no, ampliamos la búsqueda
             top_k += self.MAX_EMBEDDINGS
             resultados = self.model.query(query, top_k=top_k)
             
-            # Actualizamos nuestro set de control
-            articulos_recuperados = set()
+            articulos_recuperados = []
             for _, idx_chunk in resultados:
-                articulos_recuperados.add(self.chunck_index[idx_chunk])
-                
-            if len(resultados) < top_k:
-                break
+                id_recup = self.chunck_index[idx_chunk]
+                if id_recup not in articulos_recuperados:
+                    articulos_recuperados.append(id_recup)
 
         # 4 - Utilizar la lista ordenada del kdtree para reordenar la lista "articles"
         lista_ordenada = []
@@ -536,8 +541,6 @@ class SAR_Indexer:
                 if self.semantic:
                     self.update_chuncks(j[self.DEFAULT_FIELD], id_articulo)
 
-       
-
 
     def tokenize(self, text:str):
         """
@@ -552,8 +555,6 @@ class SAR_Indexer:
 
         """
         return self.tokenizer.sub(' ', text.lower()).split()
-
-
 
 
     def show_stats(self):
@@ -587,13 +588,10 @@ class SAR_Indexer:
             print("Positional queries are NOT allowed.")
         print(f"{'='*40}")
 
-
-
         
         ########################################
         ## COMPLETAR PARA TODAS LAS VERSIONES ##
         ########################################
-
 
 
     #################################
@@ -631,6 +629,8 @@ class SAR_Indexer:
 
         if query is None or len(query) == 0:
             return [], {}
+
+        query = query.lower()
         
         # Si se usa -S en SAR_Searcher.py
         if self.semantic_threshold is not None:
@@ -731,8 +731,6 @@ class SAR_Indexer:
             return []
         
 
-
-
     def get_positionals(self, terms:str):
         """
 
@@ -753,40 +751,49 @@ class SAR_Indexer:
         if len(terms) == 1:
             return self.get_posting(terms[0])
 
-        # 1. Recuperamos la estructura posicional completa de la primera palabra
+        # 1. Recuperamos la estructura posicional completa del primer término
+        # Ojo: necesitamos la estructura interna [[artid, [pos1, pos2]], ...]
         res_intermedio = self.index.get(terms[0], [])
         if not res_intermedio:
             return []
 
-        # 2. Vamos cruzando esa lista con el resto de palabras de la frase
+        # 2. Vamos cruzando de izquierda a derecha con el resto de palabras de la frase
         for i in range(1, len(terms)):
             siguiente_palabra = terms[i]
             posting_siguiente = self.index.get(siguiente_palabra, [])
-            
+           
             if not posting_siguiente:
-                return [] # Si una sola palabra de la frase no existe, el resultado es vacío
+                return [] # Si una palabra no existe, rompe la consecutividad
 
             nuevos_resultados = []
-            p1 = 0 # Puntero para nuestra lista acumulada
-            p2 = 0 # Puntero para la posting de la siguiente palabra
+            p1 = 0
+            p2 = 0
 
-            # Bucle estilo and_posting para emparejar los mismos artículos
+            # Merge a nivel de Artículo (id_articulo)
             while p1 < len(res_intermedio) and p2 < len(posting_siguiente):
                 artid1, posiciones1 = res_intermedio[p1]
                 artid2, posiciones2 = posting_siguiente[p2]
 
                 if artid1 == artid2:
-                    # Ahora comprobamos si las posiciones son consecutivas
                     pos_coincidentes = []
-                    
-                    # Recorremos las posiciones de la palabra anterior y la siguiente
-                    for pos1 in posiciones1:
-                        # Si pos1 + 1 está en las posiciones de la siguiente palabra
-                        if (pos1 + 1) in posiciones2:
-                            pos_coincidentes.append(pos1 + 1)
+                    pos_p1 = 0
+                    pos_p2 = 0
 
-                    # Si encontramos alguna coincidencia, guardamos este artículo
-                    # Guardamos 'pos_coincidentes' para que la tercera palabra se compare contra ellas
+                    # --------------------------------------------------------
+                    # MAGIA POSICIONAL: Merge lineal de las posiciones internas
+                    # --------------------------------------------------------
+                    while pos_p1 < len(posiciones1) and pos_p2 < len(posiciones2):
+                        # Comprobamos si la palabra siguiente va justo en la casilla de al lado
+                        if posiciones1[pos_p1] + 1 == posiciones2[pos_p2]:
+                            pos_coincidentes.append(posiciones2[pos_p2])
+                            pos_p1 += 1
+                            pos_p2 += 1
+                        elif posiciones1[pos_p1] + 1 < posiciones2[pos_p2]:
+                            pos_p1 += 1
+                        else:
+                            pos_p2 += 1
+
+                    # Si este artículo tiene la secuencia consecutiva, lo guardamos
                     if pos_coincidentes:
                         nuevos_resultados.append([artid1, pos_coincidentes])
 
@@ -801,10 +808,10 @@ class SAR_Indexer:
             if not res_intermedio:
                 return []
 
-        # 3. Al final, solo queremos una lista de IDs limpia, no las posiciones
+        # 3. Al final del todo, el usuario solo quiere recibir una posting list normal
+        # de IDs limpios de artículos (ej: [4, 12, 45]), no las posiciones internas.
         lista_final = [art[0] for art in res_intermedio]
         return lista_final
-
 
 
     def reverse_posting(self, p:list):
@@ -900,10 +907,6 @@ class SAR_Indexer:
         ########################################
 
 
-
-
-
-
     def minus_posting(self, p1, p2):
         """
         OPCIONAL PARA TODAS LAS VERSIONES
@@ -959,9 +962,6 @@ class SAR_Indexer:
         ########################################################
         ## COMPLETAR PARA TODAS LAS VERSIONES SI ES NECESARIO ##
         ########################################################
-
-
-
 
 
     #####################################
