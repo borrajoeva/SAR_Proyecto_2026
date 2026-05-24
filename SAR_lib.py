@@ -651,7 +651,10 @@ class SAR_Indexer:
             if token.startswith('"') and token.endswith('"'):
                 frase = token[1:-1] # Retiramos las comillas
                 terminos_frase = self.tokenize(frase)
-
+                
+                if not terminos_frase:
+                    continue
+                
                 if self.positional:
                     p_actual = self.get_positionals(terminos_frase)
 
@@ -752,7 +755,6 @@ class SAR_Indexer:
             return self.get_posting(terms[0])
 
         # 1. Recuperamos la estructura posicional completa del primer término
-        # Ojo: necesitamos la estructura interna [[artid, [pos1, pos2]], ...]
         res_intermedio = self.index.get(terms[0], [])
         if not res_intermedio:
             return []
@@ -779,9 +781,8 @@ class SAR_Indexer:
                     pos_p1 = 0
                     pos_p2 = 0
 
-                    # --------------------------------------------------------
-                    # MAGIA POSICIONAL: Merge lineal de las posiciones internas
-                    # --------------------------------------------------------
+                   
+                    # Merge lineal de las posiciones internas
                     while pos_p1 < len(posiciones1) and pos_p2 < len(posiciones2):
                         # Comprobamos si la palabra siguiente va justo en la casilla de al lado
                         if posiciones1[pos_p1] + 1 == posiciones2[pos_p2]:
@@ -808,8 +809,7 @@ class SAR_Indexer:
             if not res_intermedio:
                 return []
 
-        # 3. Al final del todo, el usuario solo quiere recibir una posting list normal
-        # de IDs limpios de artículos (ej: [4, 12, 45]), no las posiciones internas.
+        # 3. Al final del todo, el usuario solo quiere recibir una posting list normal de IDs limpios de artículos
         lista_final = [art[0] for art in res_intermedio]
         return lista_final
 
