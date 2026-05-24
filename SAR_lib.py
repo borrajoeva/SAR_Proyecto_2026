@@ -11,6 +11,7 @@ import nltk
 from SAR_semantics import SentenceBertEmbeddingModel, BetoEmbeddingCLSModel, BetoEmbeddingModel, SpacyStaticModel
 
 import math
+import numpy as np
 
 ## UTILIZAR PARA LA AMPLIACION
 # Selecciona un modelo semántico
@@ -228,8 +229,9 @@ class SAR_Indexer:
         # 1. Se llama al método fit pasándole la lista con todos los embeddings de las frases
         # 2. Se almacena opcionalmente el KDTree generado en el atributo de la clase
         if self.chuncks:
-            self.kdtree = self.model.fit(self.chuncks)
-
+            self.model.fit(self.chuncks)
+            self.embeddings = list(self.model.embeddings)
+            self.kdtree = self.model.kdtree
         print("done!")
 
 
@@ -256,21 +258,27 @@ class SAR_Indexer:
         if not self.chuncks:
             return []
 
-        self.model.fit(self.chuncks)
+        if self.kdtree is not None:
+            self.model.set_kdtree(self.kdtree)
+            #self.model.set_embeddings(self.embeddings)
+            self.model.set_embeddings(np.array(self.embeddings))
+        else:
+            self.model.fit(self.chuncks)
+            self.kdtree = self.model.kdtree
+
+        total_embeddings = len(self.chuncks)
 
         # 1 y 2
-        top_k = self.MAX_EMBEDDINGS
+        top_k = min(self.MAX_EMBEDDINGS, total_embeddings)
         resultados = self.model.query(query, top_k=top_k)
-
-        # 3 y 4
-        total_embeddings = len(self.embeddings)
+        
 
         while (self.semantic_threshold is not None and 
                resultados[-1][0] <= self.semantic_threshold and 
                top_k < total_embeddings):
             
             # Volvemos al paso 2 aumentando top_k
-            top_k += self.MAX_EMBEDDINGS
+            top_k = min(top_k + self.MAX_EMBEDDINGS, total_embeddings)
             
             # Volvemos al paso 1 ejecutando la query con el nuevo top_k
             resultados = self.model.query(query, top_k=top_k)
@@ -280,7 +288,7 @@ class SAR_Indexer:
         # 5
         lista_final=[]
         vistos = set() # Usamos un set para que la búsqueda sea ultrarrápida
-        
+                
         for dist, idx_chunk in resultados:
             # Si hay un umbral definido, descartamos estrictamente los que lo superen
             if self.semantic_threshold is not None and dist > self.semantic_threshold:
@@ -316,7 +324,13 @@ class SAR_Indexer:
         if not self.chuncks:
             return articles
         
-        self.model.fit(self.chuncks)
+        if self.kdtree is not None:
+            self.model.set_kdtree(self.kdtree)
+            #self.model.set_embeddings(self.embeddings)
+            self.model.set_embeddings(np.array(self.embeddings))
+        else:
+            self.model.fit(self.chuncks)
+            self.kdtree = self.model.kdtree
 
 
         # Convertimos la lista original a un set para hacer comprobaciones ultra rápidas
