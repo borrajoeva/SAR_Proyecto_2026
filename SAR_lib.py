@@ -227,8 +227,8 @@ class SAR_Indexer:
 
         # 1. Se llama al método fit pasándole la lista con todos los embeddings de las frases
         # 2. Se almacena opcionalmente el KDTree generado en el atributo de la clase
-        if self.embeddings:
-            self.kdtree = self.model.fit(self.embeddings)
+        if self.chuncks:
+            self.kdtree = self.model.fit(self.chuncks)
 
         print("done!")
 
@@ -250,6 +250,13 @@ class SAR_Indexer:
         self.load_semantic_model()
         
         # COMPLETAR
+        # Al cargar desde el .bin, el modelo se crea nuevo,
+    # así que hay que reconstruir el KDTree con los embeddings guardados
+
+        if not self.chuncks:
+            return []
+
+        self.model.fit(self.chuncks)
 
         # 1 y 2
         top_k = self.MAX_EMBEDDINGS
@@ -306,7 +313,12 @@ class SAR_Indexer:
         
         self.load_semantic_model()
         # COMPLETAR
+        if not self.chuncks:
+            return articles
         
+        self.model.fit(self.chuncks)
+
+
         # Convertimos la lista original a un set para hacer comprobaciones ultra rápidas
         articulos_buscados = set(articles)
         
@@ -605,6 +617,10 @@ class SAR_Indexer:
 
         if query is None or len(query) == 0:
             return [], {}
+        
+        # Si se usa -S en SAR_Searcher.py
+        if self.semantic_threshold is not None:
+            return self.solve_semantic_query(query), {}
 
         # Separamos los tokens respetando lo que esté entre comillas dobles
         tokens = re.findall(r'".*?"|\S+', query)
@@ -613,7 +629,7 @@ class SAR_Indexer:
         es_not = False
 
         for token in tokens:
-            if token == "NOT":
+            if token.upper() == "NOT":
                 es_not = True
                 continue
 
@@ -621,15 +637,31 @@ class SAR_Indexer:
             if token.startswith('"') and token.endswith('"'):
                 frase = token[1:-1] # Retiramos las comillas
                 terminos_frase = self.tokenize(frase)
-                p_actual = self.get_positionals(terminos_frase)
+
+                if self.positional:
+                    p_actual = self.get_positionals(terminos_frase)
+
+                else:
+                    # Si no hay índice posicional, trata la frase como AND normal
+                    p_actual = None
+                    for t in terminos_frase:
+                        p_t = self.get_posting(t)
+                        if p_actual is None:
+                            p_actual = p_t
+                        else:
+                            p_actual = self.and_posting(p_actual, p_t)
+
+                    if p_actual is None:
+                        p_actual = []
                 
             # 2. Si no tiene comillas, es una búsqueda de un solo término
             else:
                 terminos_limpios = self.tokenize(token)
-                if len(terminos_limpios) > 0:
-                    p_actual = self.get_posting(terminos_limpios[0])
-                else:
-                    p_actual = []
+                if len(terminos_limpios) == 0:
+                    continue
+                p_actual = self.get_posting(terminos_limpios[0])
+                
+
 
             # 3. Aplicamos el operador NOT si venía precedido por él
             if es_not:
@@ -641,6 +673,9 @@ class SAR_Indexer:
                 res = p_actual
             else:
                 res = self.and_posting(res, p_actual)
+
+        if res is None:
+            res = []
 
         # 5. AMPLIACIÓN SEMÁNTICA: Si el reranking está activo, reordenamos los resultados
         if self.semantic_ranking and res:
