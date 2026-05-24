@@ -740,7 +740,6 @@ class SAR_Indexer:
             return self.get_posting(terms[0])
 
         # 1. Recuperamos la estructura posicional completa de la primera palabra
-        # Recuerda que self.index[palabra] tiene: [[artid, [pos1, pos2]], ...]
         res_intermedio = self.index.get(terms[0], [])
         if not res_intermedio:
             return []
@@ -763,17 +762,17 @@ class SAR_Indexer:
                 artid2, posiciones2 = posting_siguiente[p2]
 
                 if artid1 == artid2:
-                    # ¡Mismo artículo! Ahora comprobamos si las posiciones son consecutivas
+                    # Ahora comprobamos si las posiciones son consecutivas
                     pos_coincidentes = []
                     
                     # Recorremos las posiciones de la palabra anterior y la siguiente
                     for pos1 in posiciones1:
-                        # Si pos1 + 1 está en las posiciones de la siguiente palabra... ¡bingo!
+                        # Si pos1 + 1 está en las posiciones de la siguiente palabra
                         if (pos1 + 1) in posiciones2:
                             pos_coincidentes.append(pos1 + 1)
 
                     # Si encontramos alguna coincidencia, guardamos este artículo
-                    # Ojo: guardamos 'pos_coincidentes' para que la tercera palabra se compare contra ellas
+                    # Guardamos 'pos_coincidentes' para que la tercera palabra se compare contra ellas
                     if pos_coincidentes:
                         nuevos_resultados.append([artid1, pos_coincidentes])
 
@@ -788,7 +787,7 @@ class SAR_Indexer:
             if not res_intermedio:
                 return []
 
-        # 3. Al final, el profesor solo quiere una lista de IDs limpia, no las posiciones
+        # 3. Al final, solo queremos una lista de IDs limpia, no las posiciones
         lista_final = [art[0] for art in res_intermedio]
         return lista_final
 
